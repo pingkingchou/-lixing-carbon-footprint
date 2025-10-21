@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校園碳足跡統計系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+        }
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+        .tab-button.active {
+            background-color: #1d4ed8; /* bg-blue-700 */
+            color: white;
+            font-weight: 600;
+        }
+        .tab-button:not(.active) {
+            background-color: #e5e7eb; /* bg-gray-200 */
+        }
+        .view-section {
+            display: none;
+        }
+        .view-section.active {
+            display: block;
+        }
+        /* Custom scrollbar for better aesthetics */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9; /* slate-100 */
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #94a3b8; /* slate-400 */
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b; /* slate-500 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="container mx-auto max-w-6xl w-full">
+        <div class="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+            <header class="text-center mb-6">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-800">校園碳足跡統計系統</h1>
+                <p class="text-gray-500 mt-2">記錄綠色足跡，共創永續校園</p>
+            </header>
+
+            <!-- View Toggler -->
+            <div class="flex justify-center mb-6 bg-gray-200 rounded-full p-1 max-w-lg mx-auto">
+                <button id="student-tab-button" class="tab-button w-1/3 py-2 px-4 rounded-full text-sm md:text-base active">學生班級登錄</button>
+                <button id="teacher-tab-button" class="tab-button w-1/3 py-2 px-4 rounded-full text-sm md:text-base">教師統計後台</button>
+                <button id="admin-tab-button" class="tab-button w-1/3 py-2 px-4 rounded-full text-sm md:text-base">學生名冊管理</button>
+            </div>
+
+            <!-- Student Class View -->
+            <section id="student-view" class="view-section active">
+                <form id="data-form" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="month-select" class="block text-sm font-medium text-gray-700">月份</label>
+                            <select id="month-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <!-- Months will be populated by JS -->
+                            </select>
+                        </div>
+                        <div>
+                            <label for="class-select" class="block text-sm font-medium text-gray-700">班級</label>
+                            <select id="class-select" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">請先選擇班級</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="class-roster-container" class="overflow-x-auto max-h-[50vh] custom-scrollbar border rounded-lg">
+                       <p class="text-center text-gray-500 p-8">請先選擇班級以載入學生名單</p>
+                    </div>
+
+                    <div>
+                        <button type="submit" class="w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300 disabled:bg-gray-400" disabled>
+                            送出全班資料
+                        </button>
+                    </div>
+                    <div id="student-status" class="text-center text-sm min-h-[20px]"></div>
+                </form>
+            </section>
+
+            <!-- Teacher View -->
+            <section id="teacher-view" class="view-section">
+                <div class="space-y-6">
+                    <div class="mb-4">
+                        <label for="teacher-month-select" class="block text-sm font-medium text-gray-700">選擇統計月份</label>
+                        <select id="teacher-month-select" class="mt-1 block w-full md:w-1/3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <!-- Months will be populated by JS -->
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+                        <div class="bg-green-100 p-4 rounded-lg">
+                            <h3 class="text-lg font-medium text-green-800">全校總點數</h3>
+                            <p id="total-points" class="text-3xl font-bold text-green-600">0</p>
+                        </div>
+                        <div class="bg-blue-100 p-4 rounded-lg">
+                            <h3 class="text-lg font-medium text-blue-800">全校總減碳量 (kg)</h3>
+                            <p id="total-reduction" class="text-3xl font-bold text-blue-600">0.00</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h3 class="font-semibold text-lg mb-3 text-gray-700">各班級統計</h3>
+                             <div class="overflow-y-auto max-h-80 custom-scrollbar">
+                                <table class="w-full text-sm text-left text-gray-500">
+                                    <thead class="text-xs text-gray-700 uppercase bg-gray-200 sticky top-0">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-3">班級</th>
+                                            <th scope="col" class="px-4 py-3 text-right">總點數</th>
+                                            <th scope="col" class="px-4 py-3 text-right">總減碳量(kg)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="class-summary-body">
+                                        <tr><td colspan="3" class="text-center p-4">載入中...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h3 id="student-detail-title" class="font-semibold text-lg mb-3 text-gray-700">學生詳細資料</h3>
+                            <div class="overflow-y-auto max-h-80 custom-scrollbar">
+                                <table class="w-full text-sm text-left text-gray-500">
+                                    <thead class="text-xs text-gray-700 uppercase bg-gray-200 sticky top-0">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-3">座號</th>
+                                            <th scope="col" class="px-4 py-3">姓名</th>
+                                            <th scope="col" class="px-4 py-3 text-right">貢獻點數</th>
+                                            <th scope="col" class="px-4 py-3 text-right">貢獻減碳量(kg)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="student-detail-body">
+                                        <tr><td colspan="4" class="text-center p-4">請先從左側選擇一個班級</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Admin/Roster Management View -->
+            <section id="admin-view" class="view-section">
+                <div class="space-y-6">
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-800">學生名冊管理 (CSV匯入)</h2>
+                        <p class="text-sm text-gray-500 mt-1">請上傳CSV檔案來更新全校學生名冊。這將會覆蓋現有的名冊資料。</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-6 text-center">
+                        <p class="mb-2 text-gray-600">CSV檔案格式應包含三欄：<code class="bg-gray-200 text-red-600 font-mono text-xs px-1 py-0.5 rounded">班級,座號,姓名</code></p>
+                        <p class="mb-4 text-gray-600">第一列必須是欄位標頭。</p>
+                        <button id="download-template-button" class="text-sm text-blue-600 hover:underline">下載CSV範本檔</button>
+                    </div>
+
+                    <div class="flex items-center space-x-4">
+                         <input type="file" id="csv-file-input" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                         <button id="import-csv-button" class="flex-shrink-0 bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-300">
+                            匯入名冊
+                        </button>
+                    </div>
+                    <div id="admin-status" class="text-center text-sm min-h-[20px]"></div>
+                </div>
+            </section>
+        </div>
+        <footer class="text-center mt-4 text-sm text-gray-500">
+            <p>&copy; <span id="current-year"></span> 永續校園計畫</p>
+        </footer>
+    </div>
+    
+    <!-- Confirmation Modal -->
+    <div id="confirmation-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50" style="display: none;">
+        <div class="relative mx-auto p-5 border w-full max-w-sm shadow-lg rounded-2xl bg-white">
+            <div class="mt-3 text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                    <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mt-2">確認送出</h3>
+                <div class="mt-2 px-7 py-3">
+                    <p class="text-sm text-gray-500">確定要送出 <strong id="modal-class-name"></strong> <strong id="modal-month"></strong> 的資料嗎？<br>如果該月份已有資料，將會被覆蓋。</p>
+                </div>
+                <div class="flex flex-col items-center px-4 py-3 space-y-2">
+                    <button id="modal-confirm-button" class="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        確認送出
+                    </button>
+                    <button id="modal-cancel-button" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400">
+                        取消
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Auth Error Modal -->
+    <div id="auth-error-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+        <div class="relative mx-auto p-5 border w-full max-w-lg shadow-lg rounded-2xl bg-white">
+            <div class="mt-3 text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                    <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <h3 id="auth-error-modal-title" class="text-xl leading-6 font-bold text-gray-900 mt-4">設定未完成</h3>
+                <div class="mt-2 px-2 py-3 text-left">
+                    <p id="auth-error-modal-message" class="text-sm text-gray-600 mb-4"></p>
+                    <div id="auth-error-modal-instructions" class="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg border"></div>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="auth-error-reload-button" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                        完成設定後，點此重新整理頁面
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Firebase SDK imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, addDoc, onSnapshot, serverTimestamp, query, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- 配置與初始化 ---
+        const defaultStudentData = {
+            "一年忠班": [{ "seatNo": 1, "name": "陳景天" }, { "seatNo": 2, "name": "林美麗" }, { "seatNo": 3, "name": "黃市場" }],
+            "一年孝班": [{ "seatNo": 1, "name": "張文彥" }, { "seatNo": 2, "name": "王心怡" }, { "seatNo": 3, "name": "李志豪" }],
+            "二年仁班": [{ "seatNo": 1, "name": "吳佳靜" }, { "seatNo": 2, "name": "劉俊傑" }, { "seatNo": 3, "name": "蔡雅婷" }]
+        };
+
+        let schoolRoster = {};
+        let allSubmissions = []; // Cache for all Firestore data
+        let pendingSubmissionData = null; // To hold data before confirmation
+
+        // --- Firebase 設定 ---
+        // 說明：此處已填入您專屬的 Firebase 設定碼。
+        // 這個 HTML 檔案現在可以在任何地方獨立運作，並連接到您專屬的資料庫。
+        const firebaseConfig = {
+          apiKey: "AIzaSyAGXUkLxhTZl7Pie6K-3VsF5O29HT1K75s",
+          authDomain: "lixing-carbon-footprint.firebaseapp.com",
+          projectId: "lixing-carbon-footprint",
+          storageBucket: "lixing-carbon-footprint.appspot.com",
+          messagingSenderId: "203897465047",
+          appId: "1:203897465047:web:f83cd968d64a7820aaa892",
+          measurementId: "G-KVCEPGN0LX"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        // 為了讓資料庫路徑一致，我們直接使用您的專案ID作為應用的唯一ID
+        const appId = firebaseConfig.projectId;
+
+        let userId = null;
+        const submissionsCollection = collection(db, 'artifacts', appId, 'public', 'data', 'submissions');
+        
+        // --- DOM 元素 ---
+        const studentTabButton = document.getElementById('student-tab-button');
+        const teacherTabButton = document.getElementById('teacher-tab-button');
+        const adminTabButton = document.getElementById('admin-tab-button');
+        const studentView = document.getElementById('student-view');
+        const teacherView = document.getElementById('teacher-view');
+        const adminView = document.getElementById('admin-view');
+        const monthSelect = document.getElementById('month-select');
+        const classSelect = document.getElementById('class-select');
+        const dataForm = document.getElementById('data-form');
+        const classRosterContainer = document.getElementById('class-roster-container');
+        const studentStatus = document.getElementById('student-status');
+        const submitButton = dataForm.querySelector('button[type="submit"]');
+
+        // Teacher view elements
+        const teacherMonthSelect = document.getElementById('teacher-month-select');
+        const totalPointsEl = document.getElementById('total-points');
+        const totalReductionEl = document.getElementById('total-reduction');
+        const classSummaryBody = document.getElementById('class-summary-body');
+        const studentDetailBody = document.getElementById('student-detail-body');
+        const studentDetailTitle = document.getElementById('student-detail-title');
+
+        // Admin view elements
+        const downloadTemplateButton = document.getElementById('download-template-button');
+        const csvFileInput = document.getElementById('csv-file-input');
+        const importCsvButton = document.getElementById('import-csv-button');
+        const adminStatus = document.getElementById('admin-status');
+
+        // Modal elements
+        const confirmationModal = document.getElementById('confirmation-modal');
+        const modalClassName = document.getElementById('modal-class-name');
+        const modalMonth = document.getElementById('modal-month');
+        const modalConfirmButton = document.getElementById('modal-confirm-button');
+        const modalCancelButton = document.getElementById('modal-cancel-button');
+
+        // --- 初始化函式 ---
+        
+        function loadRoster() {
+            const savedRoster = localStorage.getItem('schoolRoster');
+            try {
+                schoolRoster = savedRoster ? JSON.parse(savedRoster) : defaultStudentData;
+            } catch (e) {
+                schoolRoster = defaultStudentData;
+            }
+        }
+
+        function populateMonths(selectElement) {
+            if (!selectElement) return;
+            selectElement.innerHTML = '';
+            
+            const endDate = new Date(2026, 5, 1); // 2026年6月 (月份是 0-indexed)
+            const startDate = new Date(2025, 7, 1); // 從 2025年8月開始
+            const now = new Date();
+            
+            let currentDate = new Date(endDate);
+
+            while (currentDate >= startDate) {
+                const year = currentDate.getFullYear();
+                const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+                const option = document.createElement('option');
+                option.value = `${year}-${month}`;
+                option.textContent = `${year}年${month}月`;
+                selectElement.appendChild(option);
+                
+                // 移至上一個月
+                currentDate.setMonth(currentDate.getMonth() - 1);
+            }
+
+            // 將預設選項設為當前月份 (如果存在於列表中)
+            const currentYear = now.getFullYear();
+            const currentMonth = (now.getMonth() + 1).toString().padStart(2, '0');
+            const currentMonthValue = `${currentYear}-${currentMonth}`;
+            if (selectElement.querySelector(`option[value="${currentMonthValue}"]`)) {
+                 selectElement.value = currentMonthValue;
+            }
+        }
+        
+        function populateClasses() {
+            const currentClass = classSelect.value;
+            classSelect.innerHTML = '<option value="">請先選擇班級</option>';
+            Object.keys(schoolRoster).forEach(className => {
+                const option = document.createElement('option');
+                option.value = className;
+                option.textContent = className;
+                classSelect.appendChild(option);
+            });
+             if (currentClass && schoolRoster[currentClass]) {
+                classSelect.value = currentClass;
+            }
+        }
+
+        // --- 事件監聽 ---
+
+        function setupEventListeners() {
+            studentTabButton.addEventListener('click', () => switchView('student'));
+            teacherTabButton.addEventListener('click', () => switchView('teacher'));
+            adminTabButton.addEventListener('click', () => switchView('admin'));
+
+            classSelect.addEventListener('change', () => {
+                const selectedClass = classSelect.value;
+                if (selectedClass) {
+                    renderClassRoster(selectedClass);
+                    submitButton.disabled = false;
+                } else {
+                    classRosterContainer.innerHTML = '<p class="text-center text-gray-500 p-8">請先選擇班級以載入學生名單</p>';
+                    submitButton.disabled = true;
+                }
+            });
+            
+            teacherMonthSelect.addEventListener('change', updateDashboardView);
+
+            dataForm.addEventListener('submit', handleFormSubmit);
+            downloadTemplateButton.addEventListener('click', handleDownloadTemplate);
+            importCsvButton.addEventListener('click', handleCsvImport);
+
+            modalConfirmButton.addEventListener('click', proceedWithSubmission);
+            modalCancelButton.addEventListener('click', () => {
+                confirmationModal.style.display = 'none';
+                pendingSubmissionData = null;
+            });
+            
+            document.getElementById('auth-error-reload-button').addEventListener('click', () => {
+                window.location.reload();
+            });
+        }
+
+        // --- 核心邏輯 ---
+
+        function switchView(view) {
+            studentTabButton.classList.toggle('active', view === 'student');
+            teacherTabButton.classList.toggle('active', view === 'teacher');
+            adminTabButton.classList.toggle('active', view === 'admin');
+            studentView.classList.toggle('active', view === 'student');
+            teacherView.classList.toggle('active', view === 'teacher');
+            adminView.classList.toggle('active', view === 'admin');
+        }
+
+        function renderClassRoster(className) {
+            const students = schoolRoster[className] || [];
+            if(students.length === 0) {
+                 classRosterContainer.innerHTML = `<p class="text-center text-gray-500 p-8">此班級尚無學生資料</p>`;
+                 return;
+            }
+
+            const table = document.createElement('table');
+            table.className = 'w-full text-sm text-left text-gray-500 min-w-[700px]';
+            table.innerHTML = `
+                <thead class="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0">
+                    <tr>
+                        <th class="px-2 py-3 w-16">座號</th>
+                        <th class="px-2 py-3">姓名</th>
+                        <th class="px-2 py-3 text-center">走路上學<br>(次數)</th>
+                        <th class="px-2 py-3 text-center">共乘上學<br>(次數)</th>
+                        <th class="px-2 py-3 text-center">大眾運輸<br>(次數)</th>
+                        <th class="px-2 py-3 text-center">家長接送<br>(次數)</th>
+                        <th class="px-2 py-3 text-center">平均單趟<br>距離(km)</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            `;
+            const tbody = table.querySelector('tbody');
+            students.forEach(student => {
+                const tr = document.createElement('tr');
+                tr.className = 'bg-white border-b student-row';
+                tr.dataset.seatNo = student.seatNo;
+                tr.dataset.name = student.name;
+                tr.innerHTML = `
+                    <td class="px-2 py-2 font-medium text-gray-900 text-center">${student.seatNo}</td>
+                    <td class="px-2 py-2 font-medium text-gray-900">${student.name}</td>
+                    <td class="p-1 w-20"><input type="number" min="0" value="0" required class="w-full text-sm rounded border-gray-300 shadow-sm text-center" data-type="walk"></td>
+                    <td class="p-1 w-20"><input type="number" min="0" value="0" required class="w-full text-sm rounded border-gray-300 shadow-sm text-center" data-type="carpool"></td>
+                    <td class="p-1 w-20"><input type="number" min="0" value="0" required class="w-full text-sm rounded border-gray-300 shadow-sm text-center" data-type="public"></td>
+                    <td class="p-1 w-20"><input type="number" min="0" value="0" required class="w-full text-sm rounded border-gray-300 shadow-sm text-center" data-type="parent"></td>
+                    <td class="p-1 w-24"><input type="number" step="0.1" min="0" required class="w-full text-sm rounded border-gray-300 shadow-sm text-center" placeholder="公里" data-type="distance"></td>
+                `;
+                tbody.appendChild(tr);
+            });
+            classRosterContainer.innerHTML = '';
+            classRosterContainer.appendChild(table);
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            const month = monthSelect.value;
+            const className = classSelect.value;
+            const studentRows = classRosterContainer.querySelectorAll('.student-row');
+            let submissions = [];
+            let errors = [];
+
+            studentRows.forEach(row => {
+                const seatNo = parseInt(row.dataset.seatNo);
+                const studentName = row.dataset.name;
+                
+                const walkCountEl = row.querySelector('input[data-type="walk"]');
+                const carpoolCountEl = row.querySelector('input[data-type="carpool"]');
+                const publicCountEl = row.querySelector('input[data-type="public"]');
+                const parentCountEl = row.querySelector('input[data-type="parent"]');
+                const distanceEl = row.querySelector('input[data-type="distance"]');
+
+                if (!walkCountEl.value || !carpoolCountEl.value || !publicCountEl.value || !parentCountEl.value || !distanceEl.value) {
+                    errors.push(`${seatNo}號 ${studentName} 資料不完整`);
+                    return;
+                }
+                
+                const counts = {
+                    walk: parseInt(walkCountEl.value, 10),
+                    carpool: parseInt(carpoolCountEl.value, 10),
+                    public: parseInt(publicCountEl.value, 10),
+                    parent: parseInt(parentCountEl.value, 10),
+                };
+                const distance = parseFloat(distanceEl.value);
+
+                if (Object.values(counts).some(isNaN) || Object.values(counts).some(v => v < 0) || isNaN(distance) || distance < 0) {
+                     errors.push(`${seatNo}號 ${studentName} 輸入的數字格式錯誤`);
+                    return;
+                }
+                
+                const { points, reduction } = calculateMetrics(counts, distance);
+
+                submissions.push({
+                    month, className, seatNo, studentName, 
+                    walkCount: counts.walk,
+                    carpoolCount: counts.carpool,
+                    publicTransportCount: counts.public,
+                    parentPickupCount: counts.parent,
+                    distance, points, reduction, 
+                    createdAt: serverTimestamp(), submitter: userId
+                });
+            });
+
+            if (errors.length > 0) {
+                studentStatus.textContent = `錯誤: ${errors.join('; ')}`;
+                studentStatus.classList.add('text-red-500');
+                return;
+            }
+            
+            pendingSubmissionData = { submissions, month, className };
+            modalClassName.textContent = className;
+            modalMonth.textContent = monthSelect.options[monthSelect.selectedIndex].text;
+            confirmationModal.style.display = 'flex';
+        }
+
+        async function proceedWithSubmission() {
+            if (!pendingSubmissionData) return;
+
+            const { submissions, month, className } = pendingSubmissionData;
+            
+            confirmationModal.style.display = 'none';
+            studentStatus.textContent = '處理中，正在檢查並提交資料...';
+            studentStatus.classList.remove('text-red-500', 'text-green-500');
+            submitButton.disabled = true;
+
+            const checkQuery = query(submissionsCollection, where("month", "==", month), where("className", "==", className));
+            
+            try {
+                const querySnapshot = await getDocs(checkQuery);
+                const batch = writeBatch(db);
+
+                // If documents exist for this class and month, delete them
+                if (!querySnapshot.empty) {
+                    querySnapshot.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                }
+
+                // Add the new documents
+                submissions.forEach(sub => {
+                    const docRef = doc(submissionsCollection);
+                    batch.set(docRef, sub);
+                });
+
+                await batch.commit();
+
+                studentStatus.textContent = `成功送出/更新 ${className} 全班 ${submissions.length} 位學生的資料！`;
+                studentStatus.classList.add('text-green-500');
+                renderClassRoster(className);
+            } catch (error) {
+                 console.error("Error writing batch documents: ", error);
+                studentStatus.textContent = '送出失敗，請稍後再試。';
+                studentStatus.classList.add('text-red-500');
+            } finally {
+                submitButton.disabled = false;
+                pendingSubmissionData = null;
+                setTimeout(() => studentStatus.textContent = '', 5000);
+            }
+        }
+        
+        function handleDownloadTemplate() {
+            const template_csv = "班級,座號,姓名\n一年忠班,1,王小明\n一年忠班,2,陳美麗\n二年仁班,1,張大偉";
+            const blob = new Blob([`\uFEFF${template_csv}`], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "student_roster_template.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function handleCsvImport() {
+            const file = csvFileInput.files[0];
+            if (!file) {
+                adminStatus.textContent = '請先選擇一個CSV檔案。';
+                adminStatus.className = 'text-center text-sm min-h-[20px] text-red-500';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const csvData = event.target.result;
+                try {
+                    const newRoster = parseCsvToRoster(csvData);
+                    schoolRoster = newRoster;
+                    localStorage.setItem('schoolRoster', JSON.stringify(schoolRoster));
+                    adminStatus.textContent = `名冊已成功匯入！共 ${Object.keys(schoolRoster).length} 個班級。`;
+                    adminStatus.className = 'text-center text-sm min-h-[20px] text-green-500';
+                    populateClasses();
+                    csvFileInput.value = '';
+                } catch (error) {
+                    adminStatus.textContent = `匯入失敗：${error.message}`;
+                    adminStatus.className = 'text-center text-sm min-h-[20px] text-red-500';
+                    console.error("CSV parsing error:", error);
+                } finally {
+                    setTimeout(() => adminStatus.textContent = '', 5000);
+                }
+            };
+            reader.onerror = function() {
+                adminStatus.textContent = '讀取檔案時發生錯誤。';
+                adminStatus.className = 'text-center text-sm min-h-[20px] text-red-500';
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCsvToRoster(csvString) {
+            const newRoster = {};
+            
+            if (csvString.charCodeAt(0) === 0xFEFF) {
+                csvString = csvString.slice(1);
+            }
+
+            const lines = csvString.trim().split(/\r\n|\n/);
+
+            if (lines.length < 2) {
+                throw new Error("CSV檔案是空的或缺少資料列。");
+            }
+
+            const header = lines[0].split(',').map(h => h.trim());
+            if (header[0] !== '班級' || header[1] !== '座號' || header[2] !== '姓名') {
+                throw new Error("CSV標頭格式不符，應為 '班級,座號,姓名'。");
+            }
+            
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i];
+                if (!line.trim()) continue;
+
+                const parts = line.split(',');
+                if (parts.length !== 3) {
+                    throw new Error(`第 ${i + 1} 行格式錯誤，應有3個欄位。`);
+                }
+
+                const [className, seatNoStr, name] = parts.map(p => p.trim());
+                const seatNo = parseInt(seatNoStr, 10);
+
+                if (!className || !name || isNaN(seatNo)) {
+                    throw new Error(`第 ${i + 1} 行資料無效 (班級: ${className}, 座號: ${seatNoStr}, 姓名: ${name})。`);
+                }
+
+                if (!newRoster[className]) {
+                    newRoster[className] = [];
+                }
+                newRoster[className].push({ seatNo, name });
+            }
+            
+            for (const className in newRoster) {
+                newRoster[className].sort((a, b) => a.seatNo - b.seatNo);
+            }
+
+            return newRoster;
+        }
+
+        function calculateMetrics(counts, distance) {
+            const points = (counts.walk * 3) + (counts.carpool * 2) + (counts.public * 1);
+            
+            const reduction = 
+                (counts.walk * distance * 0.11) +
+                (counts.carpool * distance * 0.173) +
+                (counts.public * distance * 0.07) +
+                (counts.parent * 0.1 * 0.11);
+                
+            return { points, reduction };
+        }
+
+        function listenForSubmissions() {
+            onSnapshot(submissionsCollection, (snapshot) => {
+                allSubmissions = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    // Handle potential server timestamps that are not yet resolved
+                    return { ...data, createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date() };
+                });
+                updateDashboardView();
+            });
+        }
+        
+        function updateDashboardView() {
+            const schoolTotal = { points: 0, reduction: 0 };
+            const byClass = {};
+            const currentMonth = teacherMonthSelect.value;
+
+            allSubmissions.forEach(data => {
+                if (data.month !== currentMonth) return;
+
+                schoolTotal.points += (data.points || 0);
+                schoolTotal.reduction += (data.reduction || 0);
+
+                if (!byClass[data.className]) {
+                    byClass[data.className] = { points: 0, reduction: 0, students: {} };
+                }
+                byClass[data.className].points += (data.points || 0);
+                byClass[data.className].reduction += (data.reduction || 0);
+
+                const studentKey = `${data.seatNo}|${data.studentName}`;
+                if (!byClass[data.className].students[studentKey]) {
+                    byClass[data.className].students[studentKey] = { seatNo: data.seatNo, name: data.studentName, points: 0, reduction: 0 };
+                }
+                byClass[data.className].students[studentKey].points += (data.points || 0);
+                byClass[data.className].students[studentKey].reduction += (data.reduction || 0);
+            });
+            
+            renderDashboard(schoolTotal, byClass);
+        }
+
+        function renderDashboard(schoolTotal, byClass) {
+            totalPointsEl.textContent = Math.round(schoolTotal.points);
+            totalReductionEl.textContent = schoolTotal.reduction.toFixed(2);
+
+            classSummaryBody.innerHTML = '';
+            if (Object.keys(byClass).length === 0) {
+                 classSummaryBody.innerHTML = `<tr><td colspan="3" class="text-center p-4">目前所選月份尚無資料</td></tr>`;
+            } else {
+                const sortedClasses = Object.entries(byClass).sort((a, b) => b[1].points - a[1].points);
+                for (const [className, data] of sortedClasses) {
+                    const tr = document.createElement('tr');
+                    tr.className = "bg-white border-b hover:bg-blue-50 cursor-pointer";
+                    tr.innerHTML = `<td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">${className}</td><td class="px-4 py-3 text-right">${Math.round(data.points)}</td><td class="px-4 py-3 text-right">${data.reduction.toFixed(2)}</td>`;
+                    tr.addEventListener('click', () => renderStudentDetail(className, data.students));
+                    classSummaryBody.appendChild(tr);
+                }
+            }
+             studentDetailBody.innerHTML = `<tr><td colspan="4" class="text-center p-4">請先從左側選擇一個班級</td></tr>`;
+             studentDetailTitle.textContent = `學生詳細資料`;
+        }
+        
+        function renderStudentDetail(className, students) {
+            studentDetailTitle.textContent = `${className} - 學生詳細資料`;
+            studentDetailBody.innerHTML = '';
+             if (Object.keys(students).length === 0) {
+                studentDetailBody.innerHTML = `<tr><td colspan="4" class="text-center p-4">此班級尚無資料</td></tr>`;
+            } else {
+                const sortedStudents = Object.values(students).sort((a,b) => a.seatNo - b.seatNo);
+                sortedStudents.forEach(student => {
+                    const tr = document.createElement('tr');
+                    tr.className = "bg-white border-b";
+                    tr.innerHTML = `<td class="px-4 py-3">${student.seatNo}</td><td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">${student.name}</td><td class="px-4 py-3 text-right">${Math.round(student.points)}</td><td class="px-4 py-3 text-right">${student.reduction.toFixed(2)}</td>`;
+                    studentDetailBody.appendChild(tr);
+                });
+            }
+        }
+
+        // --- App Entry Point ---
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('current-year').textContent = new Date().getFullYear();
+            loadRoster();
+            populateMonths(monthSelect);
+            populateMonths(teacherMonthSelect);
+            populateClasses();
+            setupEventListeners();
+            
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    userId = user.uid;
+                    listenForSubmissions(); 
+                } else {
+                    try {
+                        await signInAnonymously(auth);
+                    } catch (error) {
+                        console.error("Authentication failed:", error);
+                        const modal = document.getElementById('auth-error-modal');
+                        const title = document.getElementById('auth-error-modal-title');
+                        const message = document.getElementById('auth-error-modal-message');
+                        const instructions = document.getElementById('auth-error-modal-instructions');
+                        
+                        let errorTitleText = "資料庫連線失敗";
+                        let errorMessageText = `發生未知的認證錯誤。錯誤碼: ${error.code}`;
+                        let instructionSteps = '';
+
+                        if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/configuration-not-found') {
+                            errorTitleText = "設定未完成：請啟用 Firebase 匿名登入";
+                            errorMessageText = "您的資料庫已成功連線，但需要一個額外步驟來允許應用程式存取。";
+                            instructionSteps = `
+                                <p class="font-semibold">請依照以下步驟操作：</p>
+                                <ol class="list-decimal list-inside space-y-1 mt-2">
+                                    <li>前往 <strong>Firebase Console</strong> 並選擇您的專案 (<strong>${firebaseConfig.projectId}</strong>)。</li>
+                                    <li>在左側選單點擊 <strong>建構 > Authentication</strong>。</li>
+                                    <li>選擇 <strong>Sign-in method</strong> 分頁。</li>
+                                    <li>在「登入服務供應商」列表中點擊 <strong>匿名</strong>。</li>
+                                    <li>將開關切換為 <strong>啟用</strong> 並點擊 <strong>儲存</strong>。</li>
+                                    <li>完成後，請點擊下方的紅色按鈕重新整理此頁面。</li>
+                                </ol>
+                            `;
+                        }
+                        
+                        title.textContent = errorTitleText;
+                        message.textContent = errorMessageText;
+                        instructions.innerHTML = instructionSteps;
+                        modal.classList.remove('hidden');
+                        modal.style.display = 'flex';
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+
