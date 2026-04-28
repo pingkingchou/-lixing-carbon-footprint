@@ -308,6 +308,7 @@
         let pendingSubmissionData = null;
         let pendingDeleteData = null;
         let requestedView = null;
+        let pendingStudentClass = null;
         let appConfig = { passwords: { admin: '1557', student: '' } };
 
         // --- Firebase 設定 ---
@@ -431,9 +432,18 @@
             classSelect.addEventListener('change', () => {
                 const selectedClass = classSelect.value;
                 if (selectedClass) {
-                    renderClassRoster(selectedClass);
-                    submitButton.disabled = false;
+                    // 學生登錄密碼改在「選擇班級」時檢查：
+                    // 不再進入學生登錄頁時就要求密碼，也不等到送出/修改資料時才要求。
+                    if (appConfig.passwords && appConfig.passwords.student && sessionStorage.getItem('isStudentAuthenticated') !== 'true') {
+                        pendingStudentClass = selectedClass;
+                        classRosterContainer.innerHTML = '<p class="text-center text-gray-500 p-8">請先輸入學生登錄密碼，密碼正確後會載入班級名冊。</p>';
+                        submitButton.disabled = true;
+                        showLoginModal('student', 'student-class');
+                    } else {
+                        unlockSelectedClass(selectedClass);
+                    }
                 } else {
+                    pendingStudentClass = null;
                     classRosterContainer.innerHTML = '<p class="text-center text-gray-500 p-8">請先選擇班級以載入學生名單</p>';
                     submitButton.disabled = true;
                 }
@@ -457,11 +467,11 @@
             });
 
             loginButton.addEventListener('click', handleLoginAttempt);
-            loginCancelButton.addEventListener('click', closeLoginModal);
+            loginCancelButton.addEventListener('click', handleLoginCancel);
             passwordInput.addEventListener('keyup', (e) => {
                 if (e.key === 'Enter') handleLoginAttempt();
             });
-            loginModal.addEventListener('click', (e) => { if(e.target === loginModal) closeLoginModal(); });
+            loginModal.addEventListener('click', (e) => { if(e.target === loginModal) handleLoginCancel(); });
 
             saveAdminPasswordButton.addEventListener('click', () => savePassword('admin'));
             saveStudentPasswordButton.addEventListener('click', () => savePassword('student'));
@@ -476,12 +486,9 @@
             let needsAuth = false;
             let authType = '';
 
+            // 學生登錄頁本身不再要求密碼；改為選擇班級時才要求學生登錄密碼。
             if (view === 'student') {
-                if (appConfig.passwords && appConfig.passwords.student) {
-                    needsAuth = true;
-                    authType = 'student';
-                    isAuthenticated = sessionStorage.getItem('isStudentAuthenticated') === 'true';
-                }
+                needsAuth = false;
             } else if (view === 'teacher' || view === 'admin') {
                 needsAuth = true;
                 authType = 'admin';
@@ -494,6 +501,11 @@
                 switchView(view);
             }
         }
+
+        function unlockSelectedClass(className) {
+            renderClassRoster(className);
+            submitButton.disabled = false;
+        }
         
         function showLoginModal(type, targetView) {
             requestedView = targetView;
@@ -504,23 +516,45 @@
             passwordInput.focus();
         }
 
-        function closeLoginModal() {
+        function closeLoginModal(keepRequestedView = false) {
             loginModal.style.display = 'none';
             passwordInput.value = '';
             loginError.textContent = '';
-            requestedView = null;
+            if (!keepRequestedView) {
+                requestedView = null;
+            }
+        }
+
+        function handleLoginCancel() {
+            if (requestedView === 'student-class') {
+                pendingStudentClass = null;
+                classSelect.value = '';
+                classRosterContainer.innerHTML = '<p class="text-center text-gray-500 p-8">請先選擇班級以載入學生名單</p>';
+                submitButton.disabled = true;
+            }
+            closeLoginModal();
         }
 
         function handleLoginAttempt() {
             const enteredPassword = passwordInput.value;
-            const isAdminLogin = (requestedView === 'teacher' || requestedView === 'admin');
+            const target = requestedView;
+            const isAdminLogin = (target === 'teacher' || target === 'admin');
             const targetPassword = isAdminLogin ? appConfig.passwords.admin : appConfig.passwords.student;
             
             if (enteredPassword === targetPassword) {
                 sessionStorage.setItem(isAdminLogin ? 'isAdminAuthenticated' : 'isStudentAuthenticated', 'true');
-                closeLoginModal();
-                if (requestedView) {
-                    switchView(requestedView);
+                closeLoginModal(true);
+
+                if (target === 'student-class') {
+                    const className = pendingStudentClass || classSelect.value;
+                    if (className) {
+                        unlockSelectedClass(className);
+                    }
+                    pendingStudentClass = null;
+                    requestedView = null;
+                } else if (target) {
+                    switchView(target);
+                    requestedView = null;
                 }
             } else {
                 loginError.textContent = '密碼錯誤，請重試。';
@@ -1011,4 +1045,3 @@ service cloud.firestore {
     </script>
 </body>
 </html>
-
